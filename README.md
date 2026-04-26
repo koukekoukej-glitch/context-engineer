@@ -1,90 +1,75 @@
 # Context Engineer
 
-A skill for **context engineering** — designing behavior-control artifacts (Skills, Rules, Docs, Hooks) for a specific reader (a future model instance), not tweaking prompt blobs.
+AI 行为控制制品（Skill / Rule / Doc / Hook）的工程化设计工具。把提示词编写从即兴发挥变成可复现的工程流程——每个制品面向的读者是一个没有对话记忆的未来模型实例。
 
-**[中文版 / Chinese →](README.zh-CN.md)**
-
----
-
-## What's inside
-
-One skill, two entry points:
-
-| Entry point | What it does | When to invoke |
-|-------------|--------------|----------------|
-| `/context-engineer` | Production flow. Mines your real situation, picks the right artifact type (Skill / Rule / Doc / Hook), writes with failure-mode discipline, then automatically spawns an independent reviewer. | "Write a skill for …", "I want the agent to do X whenever Y", "improve this prompt" |
-| `/context-review` | Independent audit. Spawns a fresh agent with a clean attention pool to review an existing artifact — finds structural issues that silently break model behavior, not style nits. | "Review this skill", "check my rule", "审一下" |
-
-Both entries share the same reader model and review checklist — the production flow calls the reviewer in its Step 4; the reviewer is also independently callable on artifacts you didn't write.
+[English](README.en.md)
 
 ---
 
-## Why it exists
+## 特性
 
-Ad-hoc prompt writing produces artifacts that work in a demo and drift under real use. This skill treats every artifact as **infrastructure** aimed at a specific reader (a future model with no memory of your conversation), and enforces:
+- **情境驱动** — 先挖掘真实问题再选择制品类型，不是拿到需求就开始写
+- **约束分级** — 高风险规则只给后果（防止模型绕过）；中风险带理由（支持推广）；偏好用轻约束
+- **注意力预算** — Rule < 50 行，Skill 核心路径 < 500 行；冗余是缺陷不是完备
+- **独立审查** — 写完后自动启动干净的 Agent 实例审查，作者的注意力池已被草稿污染
+- **过期脚手架清除** — 为旧模型写的指令在新模型上是死重量，定期审计移除
 
-- **Situation before solution.** "I want a code-review skill" can mean ten different things — extract the real problem before writing a line.
-- **Severity-graded constraints.** High-risk rules use *consequences* without reasoning (to block rationalization). Mid-risk rules demand a *WHY* (to activate generalization). Preferences stay light.
-- **Attention budget is a real budget.** Rules < 50 lines. Skill core path < 500 lines. Bloat is a defect, not thoroughness.
-- **Independent review by default.** The author's attention pool is contaminated by their own draft — a clean one catches what you can't.
-- **No stale scaffolding.** Instructions written for older models (anti-emoji, anti-over-apologizing, forced progress summaries) are audited at each model upgrade — dead rules still burn attention and can conflict with new defaults.
+完整的读者心理模型（7 个特征）和编写规则（R1–R8）在 [`skills/context-engineer/SKILL.md`](skills/context-engineer/SKILL.md)。
 
-The full reader model (7 traits of how models read context) and the writing rules (R1–R8) live inside [`skills/context-engineer/SKILL.md`](skills/context-engineer/SKILL.md).
+### 入口
+
+| 命令 | 功能 | 触发方式 |
+|------|------|---------|
+| `/context-engineer` | 制品设计流程：挖掘情境 → 选择类型 → 失败模式纪律编写 → 独立审查 | "写一个 skill"、"我想让 Agent 在 X 时做 Y" |
+| `/context-review` | 独立审查：干净 Agent 用结构化清单检查制品的结构性问题 | "审一下这个 skill"、"检查一下质量" |
+
+两个入口共享同一套读者模型和审查清单。设计流程在第四步自动调用审查；审查也可独立使用。
 
 ---
 
-## Example sessions
+## 示例
 
-**Using `/context-engineer`:**
+**`/context-engineer`：**
 
-> User: *"I want the agent to run our database migrations more carefully."*
+> 输入：*"我想让 Agent 做数据库迁移的时候更小心。"*
 >
-> The skill first asks sharpening questions: is this for you or your team? What went wrong the last time? Can you show a concrete incident? It classifies the need as a **Rule** (a 50-line behavior constraint), not a Skill — because the behavior is always-on, not step-by-step. It names the likely failure modes (skipping validation, claiming success without checking), drafts the artifact, then spawns a fresh reviewer before handing back the result.
+> Skill 先澄清：给谁用？上次出了什么事？有具体事故吗？判断应写成 Rule（行为约束）而非 Skill——因为行为始终生效。识别失败模式（跳过校验、未检查就报告成功），写出制品后启动独立审查。
 
-**Using `/context-review`:**
+**`/context-review`：**
 
-> User: *"Audit `skills/deploy-guard/SKILL.md`."*
+> 输入：*"审一下 `skills/deploy-guard/SKILL.md`。"*
 >
-> The skill spawns an independent agent with no conversation context, feeding it only the artifact and the review checklist. It reports findings by severity: attention-budget overruns, completeness illusions (lists the model will treat as exhaustive), rules missing a WHY, rigid rules that should allow edge-case judgment. Each finding comes with a concrete rewrite, not a vague "consider improving".
+> 启动无上下文的独立 Agent，按严重程度报告：注意力预算超标、完备性幻觉、缺少理由的规则、过于刚性的边界判断。每项发现附具体改写。
 
 ---
 
-## Install
+## 模型校准
 
-The skill ships in a widely-adopted skill file layout (a markdown file with YAML frontmatter + optional `references/`). If your agent harness supports this layout directly, drop the folders into its skills directory:
+编写风格针对当代前沿模型调优：
+
+- 正面指令优先于否定压制——现代模型默认克制，多数"不要做 X"是死重量
+- 逐步精力标注——"这里仔细想" / "这步机械操作，别过度思考"
+- 刚性规则只用于高风险场景，其余带理由支持推广
+
+旧模型脚手架（"不要用 emoji"、"每 N 步总结"）已移除。
+
+---
+
+## 安装
 
 ```bash
 git clone https://github.com/koukekoukej-glitch/context-engineer.git
-cp -r context-engineer/skills/* <your-skills-dir>/
+cp -r context-engineer/skills/* <你的 skills 目录>/
 ```
 
-Or symlink, if you want to pull updates later:
+或用符号链接：
 
 ```bash
-ln -s "$(pwd)/context-engineer/skills/context-engineer" <your-skills-dir>/context-engineer
-ln -s "$(pwd)/context-engineer/skills/context-review"   <your-skills-dir>/context-review
+ln -s "$(pwd)/context-engineer/skills/context-engineer" <skills 目录>/context-engineer
+ln -s "$(pwd)/context-engineer/skills/context-review"   <skills 目录>/context-review
 ```
 
-Then invoke:
-
-- `/context-engineer` — design a new artifact
-- `/context-review` — audit an existing one
-
-Both also trigger on natural language ("write a skill for …", "审一下这个 rule"), not only slash commands.
-
-**Using a harness that doesn't understand this layout?** The file format is convention, but the methodology — reader model, severity-graded constraints, attention budgeting, independent review — is portable. Paste `SKILL.md` into whatever prompt layer your framework provides.
-
----
-
-## Calibrated for modern frontier models
-
-The writing style is tuned for strong-instruction-following model defaults:
-
-- Positive-framed instructions preferred over negative suppression — modern models already default to restraint, so most "don't do X" rules are dead weight.
-- Per-step effort annotations ("think carefully here", "this is mechanical, don't over-think") — a controllable dimension in recent models that the skill uses by design.
-- Rigid rules only for truly high-risk cases. Most rules carry a WHY so the model can generalize to unseen situations instead of memorizing.
-
-Older scaffolding — "don't use emojis", "don't over-apologize", "summarize every N steps" — has been intentionally removed.
+核心方法论可移植到任何 prompt 层——文件格式是约定，读者模型和编写纪律是通用的。
 
 ---
 
