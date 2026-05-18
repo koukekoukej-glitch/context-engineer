@@ -2,7 +2,7 @@
 
 A skill for **context engineering** — designing behavior-control artifacts (Skills, Rules, Docs, Hooks) for a specific reader (a future model instance), not tweaking prompt blobs.
 
-**[中文版 / Chinese →](README.zh-CN.md)**
+**[中文版 / Chinese →](README.md)**
 
 ---
 
